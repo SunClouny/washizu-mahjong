@@ -30,7 +30,7 @@ function start(room, token, randomInt) {
   deal(room,randomInt);
 }
 function deal(room,randomInt){
-  const wall=makeWall(randomInt); room.hands=Array.from({length:4},()=>[]); room.discards=Array.from({length:4},()=>[]);room.discardHistory=Array.from({length:4},()=>[]);
+  const wall=makeWall(randomInt); room.hands=Array.from({length:4},()=>[]); room.discards=Array.from({length:4},()=>[]);room.discardHistory=Array.from({length:4},()=>[]);room.riverCalled=[false,false,false,false];
   for(let i=0;i<13;i++) for(let p=0;p<4;p++) room.hands[p].push(wall.pop());
   for(const hand of room.hands)hand.sort((a,b)=>a.face.localeCompare(b.face));
   room.deadWall=wall.splice(0,14);room.wall=wall;room.kanCount=0;room.kanOwners=[];room.abortAfterDiscard=false;room.doraIndicators=[room.deadWall[4].face];room.rinshan=false;room.uninterrupted=true;room.doubleRiichi=[false,false,false,false];room.ippatsu=[false,false,false,false];room.melds=Array.from({length:4},()=>[]);room.drawnIds=[null,null,null,null];room.afterCall=false;room.allowedDiscards=null;room.riichi=[false,false,false,false];room.furiten=[false,false,false,false];room.pending=null;room.result=null;room.dora=room.doraIndicators[0];const drawn=room.wall.pop();room.hands[room.dealer].push(drawn);room.drawnIds[room.dealer]=drawn.id; room.turn=room.dealer; room.phase='playing'; room.version++;
@@ -117,7 +117,7 @@ function respond(room,token,choice,pattern,tileIds) {
       const callers=Object.keys(p.answers).map(Number).filter(i=>['chi','pon','kan'].includes(p.answers[i].choice)).sort((a,b)=>((p.answers[b].choice!=='chi')-(p.answers[a].choice!=='chi'))||((a-p.discarder+4)%4-(b-p.discarder+4)%4));
       const caller=callers[0],answer=p.answers[caller],used=answer.tileIds.map(id=>room.hands[caller].find(t=>t.id===id));
       cancelIppatsu(room);
-      room.hands[caller]=room.hands[caller].filter(t=>!answer.tileIds.includes(t.id));room.discards[p.discarder].pop();
+      room.hands[caller]=room.hands[caller].filter(t=>!answer.tileIds.includes(t.id));room.discards[p.discarder].pop();room.riverCalled[p.discarder]=true;
       room.melds[caller].push({pattern:answer.pattern,tiles:[...used,p.tile].map(t=>({face:t.face,transparent:t.transparent}))});
       if(answer.choice==='kan')replacementDraw(room,caller);
       else {room.turn=caller;room.afterCall=true;room.allowedDiscards=callDiscards(room.hands[caller].map(t=>t.face),room.melds[caller].map(m=>m.pattern),answer.pattern);room.phase='playing';}
@@ -125,8 +125,12 @@ function respond(room,token,choice,pattern,tileIds) {
     else if(room.uninterrupted&&room.discardHistory.every(h=>h.length===1)&&room.discardHistory.every(h=>h[0]===room.discardHistory[0][0])&&/^z[1-4]$/.test(room.discardHistory[0][0])){abortRound(room,'四風連打');}
     else if(room.wall.length===0){
       const tenpai=room.hands.map((h,i)=>waits(h.map(t=>t.face),room.melds[i].map(m=>m.pattern)).length>0),n=tenpai.filter(Boolean).length;
-      if(n>0&&n<4)room.scores=room.scores.map((s,i)=>s+(tenpai[i]?3000/n:-3000/(4-n)));
-      room.result={method:'draw',tenpai};room.phase='exhausted';room.turn=null;
+      const nagashi=room.discardHistory.map((h,i)=>!room.riverCalled[i]&&h.length>0&&h.every(face=>face[0]==='z'||face[1]==='1'||face[1]==='9'));
+      if(nagashi.some(Boolean)){
+        const changes=[0,0,0,0];for(let winner=0;winner<4;winner++)if(nagashi[winner])for(let i=0;i<4;i++)if(i!==winner){const amount=winner===room.dealer||i===room.dealer?4000:2000;changes[i]-=amount;changes[winner]+=amount;}
+        room.scores=room.scores.map((s,i)=>s+changes[i]);room.result={method:'nagashi',nagashi,tenpai,scoreChanges:changes};
+      }else{if(n>0&&n<4)room.scores=room.scores.map((s,i)=>s+(tenpai[i]?3000/n:-3000/(4-n)));room.result={method:'draw',tenpai};}
+      room.phase='exhausted';room.turn=null;
     }
     else {room.turn=(p.discarder+1)%4;const drawn=room.wall.pop();room.hands[room.turn].push(drawn);room.drawnIds[room.turn]=drawn.id;room.afterCall=false;if(!room.riichi[room.turn])room.furiten[room.turn]=false;room.phase='playing';}
     room.pending=null;

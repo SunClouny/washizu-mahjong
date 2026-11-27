@@ -107,3 +107,17 @@ test('終局時に残った供託はトップへ渡し、順位を表示する',
  const {room,token}=roomApi.createRoom('親');roomApi.join(room,'南');roomApi.join(room,'西');roomApi.join(room,'北');roomApi.start(room,token);room.round=4;room.dealer=3;room.scores=[24000,30000,23000,22000];room.riichiSticks=1;room.phase='exhausted';room.result={method:'draw',tenpai:[false,false,false,false]};roomApi.nextRound(room,token);
  const view=roomApi.snapshot(room,token);assert.equal(view.phase,'finished');assert.equal(room.riichiSticks,0);assert.equal(view.rankings[0].seat,1);assert.equal(view.rankings[0].score,31000);assert.equal(room.scores.reduce((a,b)=>a+b),100000);
 });
+test('流局時に河が么九牌のみで鳴かれていない場合は流し満貫',()=>{
+ const {room,token}=roomApi.createRoom('親');const b=roomApi.join(room,'南'),c=roomApi.join(room,'西'),d=roomApi.join(room,'北');roomApi.start(room,token);
+ room.wall=[];room.discardHistory=[['m1'],['m2'],['m3'],['m4']];room.hands[0][0]={id:'last',face:'m9',transparent:true};roomApi.discard(room,token,'last');for(const t of [b,c,d])roomApi.respond(room,t,'pass');
+ assert.equal(room.result.method,'nagashi');assert.deepEqual(room.result.nagashi,[true,false,false,false]);assert.deepEqual(room.result.scoreChanges,[12000,-4000,-4000,-4000]);assert.equal(room.scores.reduce((a,b)=>a+b),100000);
+});
+test('四家立直は宣言牌へのロンがなければ途中流局',()=>{
+ const {room,token}=roomApi.createRoom('親');const b=roomApi.join(room,'南'),c=roomApi.join(room,'西'),d=roomApi.join(room,'北');roomApi.start(room,token);room.riichi=[true,true,true,true];const tile=room.hands[0].find(t=>t.id===room.drawnIds[0]);roomApi.discard(room,token,tile.id);for(const t of [b,c,d])roomApi.respond(room,t,'pass');assert.equal(room.phase,'exhausted');assert.equal(room.result.reason,'四家立直');
+});
+test('四槓散了は嶺上打牌へのロン機会のあとに成立',()=>{
+ const {room,token}=roomApi.createRoom('親');const b=roomApi.join(room,'南'),c=roomApi.join(room,'西'),d=roomApi.join(room,'北');roomApi.start(room,token);room.abortAfterDiscard=true;const tile=room.hands[0][0];roomApi.discard(room,token,tile.id);assert.equal(room.phase,'response');for(const t of [b,c,d])roomApi.respond(room,t,'pass');assert.equal(room.result.reason,'四槓散了');
+});
+test('親の配牌直後のツモには天和が成立',()=>{
+ const {room,token}=roomApi.createRoom('親');roomApi.join(room,'南');roomApi.join(room,'西');roomApi.join(room,'北');roomApi.start(room,token);const faces=['m1','m2','m3','p1','p2','p3','s1','s2','s3','z1','z1','z1','z2','z2'];room.hands[0]=faces.map((face,i)=>({id:'a'+i,face,transparent:true}));room.drawnIds[0]='a13';roomApi.tsumo(room,token);assert.ok(room.result.yaku.some(y=>y.name==='天和'));
+});
