@@ -105,7 +105,7 @@ function respond(room,token,choice,pattern,tileIds) {
     const winners=Object.keys(p.answers).map(Number).filter(i=>p.answers[i].choice==='ron').sort((a,b)=>(a-p.discarder+4)%4-(b-p.discarder+4)%4);
     if(winners.length){
       if(p.riichiDeclaration){room.riichi[p.discarder]=false;room.doubleRiichi[p.discarder]=false;room.ippatsu[p.discarder]=false;room.scores[p.discarder]+=1000;room.riichiSticks--;}
-      const winner=winners[0],r=ronResult(room,winner);if(p.kind==='added-kan')room.hands[p.discarder]=room.hands[p.discarder].filter(t=>t.id!==p.tile.id);applyPayment(room,r.payments);room.result={winner,method:'ron',discarder:p.discarder,uraIndicators:uraFor(room,winner),...r};room.riichiSticks=0;room.phase='won';room.turn=null;
+      const winner=winners[0],r=ronResult(room,winner);if(p.kind==='added-kan')room.hands[p.discarder]=room.hands[p.discarder].filter(t=>t.id!==p.tile.id);applyPayment(room,r.payments);room.result={winner,method:'ron',discarder:p.discarder,winningTile:p.tile.face,winningHand:room.hands[winner].map(t=>({face:t.face,transparent:t.transparent})).concat([{face:p.tile.face,transparent:p.tile.transparent}]),uraIndicators:uraFor(room,winner),scoreChanges:room.scores.map((_,i)=>r.payments[seatWind(room,i)]),...r};room.riichiSticks=0;room.phase='won';room.turn=null;
     }
     else if(p.kind==='added-kan'){
       const player=p.discarder,m=room.melds[player].find(m=>m.pattern===p.pattern.slice(0,5));
@@ -142,7 +142,7 @@ function tsumo(room, token) {
   const result=calculate(hand.slice(0,-1).map(t=>t.face),hand[hand.length-1].face,{seat:seatWind(room,seat),riichi:room.riichi[seat],doubleRiichi:room.doubleRiichi[seat],ippatsu:room.ippatsu[seat],heavenly,doraIndicators:room.doraIndicators,uraIndicators:uraFor(room,seat),riichiSticks:room.riichiSticks,honba:room.honba,melds:room.melds[seat].map(m=>m.pattern),rinshan:room.rinshan,lastTile:!room.rinshan&&room.wall.length===0?1:0});
   if(!result) throw new Error('和了できる役がありません');
   applyPayment(room,result.payments);
-  room.result={winner:seat,method:'tsumo',uraIndicators:uraFor(room,seat),...result};room.riichiSticks=0;room.phase='won';room.turn=null;room.version++;
+  room.result={winner:seat,method:'tsumo',winningTile:hand[hand.length-1].face,winningHand:hand.map(t=>({face:t.face,transparent:t.transparent})),uraIndicators:uraFor(room,seat),scoreChanges:room.scores.map((_,i)=>result.payments[seatWind(room,i)]),...result};room.riichiSticks=0;room.phase='won';room.turn=null;room.version++;
 }
 function closedKan(room,token,pattern,tileIds){
  const seat=seatFor(room,token);
