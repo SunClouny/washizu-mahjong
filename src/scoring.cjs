@@ -19,4 +19,8 @@ function calculate(faces,winningTile,options={}) {
  if(!result||!result.hupai||result.hupai.length===0||!result.defen)return null;
  return {fu:result.fu,han:result.fanshu,yakuman:result.damanguan,yaku:result.hupai,points:result.defen,payments:result.fenpei};
 }
-module.exports={calculate};
+function waits(faces) {
+ const hand=hand13(faces);
+ return M.Util.xiangting(hand)===0 ? M.Util.tingpai(hand) : [];
+}
+module.exports={calculate,waits};
