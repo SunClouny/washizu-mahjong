@@ -15,3 +15,19 @@ test('画面操作から4人で入室、配牌、並べ替え、打牌が進む'
  await host.doc.getElementById('discard').onclick();assert.equal(host.run('state.phase'),'response');for(const c of others){await c.run('refresh()');if(c.run("state.phase==='response' && state.pending && !state.pending.answered && state.pending.discarder!==state.seat"))await c.doc.getElementById('pass').onclick();}
  await host.run('refresh()');assert.equal(host.run('state.phase'),'playing');assert.equal(host.run('state.turn'),1);assert.ok(host.run('state.scores.every(x=>x===25000)'));
 });
+test('画面から4人で東風戦の最後まで進行し順位を表示',async()=>{
+ const server=createServer(),clients=Array.from({length:4},()=>client(server));const [host,...others]=clients;host.doc.getElementById('name').value='親';await host.doc.getElementById('create').onclick();const code=host.run('session.code');
+ for(let i=0;i<3;i++){others[i].doc.getElementById('name').value='子'+i;others[i].doc.getElementById('code').value=code;await others[i].doc.getElementById('join').onclick();}
+ await host.run('refresh()');await host.doc.getElementById('start').onclick();let iterations=0;
+ while(iterations++<2500){
+   for(const c of clients)await c.run('refresh()');
+   if(host.run("state.phase==='finished'"))break;
+   if(host.run("state.phase==='playing'")){
+     const seat=host.run('state.turn'),c=clients[seat];await c.run('refresh()');if(!c.run("state.phase==='playing' && state.turn===state.seat"))continue;
+     const hand=c.doc.getElementById('hand').children;assert.ok(hand.length>0);hand[hand.length-1].onclick();await c.doc.getElementById('discard').onclick();
+   }else if(host.run("state.phase==='response'")){
+     for(const c of clients){await c.run('refresh()');if(c.run("state.phase==='response' && state.pending && !state.pending.answered && state.pending.discarder!==state.seat"))await c.doc.getElementById('pass').onclick();}
+   }else if(host.run("state.phase==='won'||state.phase==='exhausted'")){await host.doc.getElementById('next').onclick();}
+ }
+ await host.run('refresh()');assert.equal(host.run('state.phase'),'finished');assert.equal(host.run('state.rankings.length'),4);assert.ok(iterations<2500);
+});
