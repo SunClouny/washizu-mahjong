@@ -28,6 +28,8 @@ function createServer(){return http.createServer(async(req,res)=>{try{
   if(url.pathname==='/api/discard'){R.discard(room,data.token,data.tileId,data.riichi===true);return respond(res,200,R.snapshot(room,data.token));}
   if(url.pathname==='/api/respond'){R.respond(room,data.token,data.choice,data.pattern,data.tileIds);return respond(res,200,R.snapshot(room,data.token));}
   if(url.pathname==='/api/tsumo'){R.tsumo(room,data.token);return respond(res,200,R.snapshot(room,data.token));}
+  if(url.pathname==='/api/closed-kan'){R.closedKan(room,data.token,data.pattern,data.tileIds);return respond(res,200,R.snapshot(room,data.token));}
+  if(url.pathname==='/api/added-kan'){R.addedKan(room,data.token,data.pattern,data.tileId);return respond(res,200,R.snapshot(room,data.token));}
   if(url.pathname==='/api/next'){R.nextRound(room,data.token);return respond(res,200,R.snapshot(room,data.token));}
   return respond(res,404,{error:'見つかりません'});
  }catch(err){return respond(res,400,{error:err.message});}});}

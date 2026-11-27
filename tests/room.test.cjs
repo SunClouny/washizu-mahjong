@@ -55,3 +55,26 @@ test('ポンはチーより優先し、合法な2枚以外を拒否',()=>{
  const mk=(faces,prefix)=>faces.map((face,i)=>({id:prefix+i,face,transparent:true}));room.hands[1]=mk(['m1','m3','m7','m8','m9','p1','p2','p3','s1','s2','s3','z2','z2'],'b');room.hands[2]=mk(['m2','m2','m7','m8','m9','p1','p2','p3','s1','s2','s3','z3','z3'],'c');
  room.hands[0][0]={id:'throw',face:'m2',transparent:true};roomApi.discard(room,token,'throw');roomApi.respond(room,b,'chi','m12-3',['b0','b1']);let pattern=roomApi.snapshot(room,c).pending.calls.pon[0];assert.ok(pattern);roomApi.respond(room,c,'pon',pattern,['c0','c1']);roomApi.respond(room,d,'pass');assert.equal(room.turn,2);assert.equal(room.melds[2][0].pattern,pattern);assert.equal(room.melds[1].length,0);
 });
+test('暗カンで嶺上牌を引き、カンドラを表示する',()=>{
+ const {room,token}=roomApi.createRoom('親');roomApi.join(room,'南');roomApi.join(room,'西');roomApi.join(room,'北');roomApi.start(room,token);
+ const faces=['m1','m1','m1','m1','p1','p2','p3','s1','s2','s3','z1','z1','z2','z2'];room.hands[0]=faces.map((face,i)=>({id:'a'+i,face,transparent:i!==0}));const before=room.wall.length;
+ assert.ok(roomApi.snapshot(room,token).closedKans.includes('m1111'));roomApi.closedKan(room,token,'m1111',['a0','a1','a2','a3']);
+ assert.equal(room.hands[0].length,11);assert.equal(room.melds[0][0].closed,true);assert.equal(room.wall.length,before-1);assert.equal(room.doraIndicators.length,2);assert.equal(room.rinshan,true);
+});
+test('大明カンは3枚を選んで嶺上牌を引く',()=>{
+ const {room,token}=roomApi.createRoom('親');const b=roomApi.join(room,'南'),c=roomApi.join(room,'西'),d=roomApi.join(room,'北');roomApi.start(room,token);
+ const faces=['m2','m2','m2','m7','m8','m9','p1','p2','p3','s1','s2','s3','z2'];room.hands[1]=faces.map((face,i)=>({id:'b'+i,face,transparent:i!==0}));room.hands[0][0]={id:'throw',face:'m2',transparent:true};roomApi.discard(room,token,'throw');
+ const pattern=roomApi.snapshot(room,b).pending.calls.kan[0];assert.ok(pattern);roomApi.respond(room,b,'kan',pattern,['b0','b1','b2']);roomApi.respond(room,c,'pass');roomApi.respond(room,d,'pass');assert.equal(room.turn,1);assert.equal(room.hands[1].length,11);assert.equal(room.kanCount,1);assert.equal(room.doraIndicators.length,2);
+});
+test('加カンの成立前に全員のロン機会を設け、パス後に嶺上牌を引く',()=>{
+ const {room,token}=roomApi.createRoom('親');const b=roomApi.join(room,'南'),c=roomApi.join(room,'西'),d=roomApi.join(room,'北');roomApi.start(room,token);
+ room.melds[0]=[{pattern:'m222+',tiles:[{face:'m2',transparent:true},{face:'m2',transparent:true},{face:'m2',transparent:false}]}];let faces=['m2','m7','m8','m9','p1','p2','p3','s1','s2','s3','z2'];room.hands[0]=faces.map((face,i)=>({id:'a'+i,face,transparent:true}));
+ assert.ok(roomApi.snapshot(room,token).addedKans.includes('m222+2'));roomApi.addedKan(room,token,'m222+2','a0');assert.equal(room.phase,'response');assert.deepEqual(roomApi.snapshot(room,b).pending.calls,{chi:[],pon:[],kan:[]});
+ for(const t of [b,c,d])roomApi.respond(room,t,'pass');assert.equal(room.melds[0][0].pattern,'m222+2');assert.equal(room.kanCount,1);assert.equal(room.hands[0].length,11);assert.equal(room.phase,'playing');
+});
+test('加カンを槍槓でき、点数精算はロンを優先',()=>{
+ const {room,token}=roomApi.createRoom('親');const b=roomApi.join(room,'南'),c=roomApi.join(room,'西'),d=roomApi.join(room,'北');roomApi.start(room,token);
+ room.melds[0]=[{pattern:'m222+',tiles:[{face:'m2'},{face:'m2'},{face:'m2'}]}];room.hands[0]=['m2','m7','m8','m9','p1','p2','p3','s1','s2','s3','z2'].map((face,i)=>({id:'a'+i,face,transparent:true}));
+ room.hands[1]=['m1','m3','p1','p2','p3','s1','s2','s3','z1','z1','z1','z2','z2'].map((face,i)=>({id:'b'+i,face,transparent:true}));
+ roomApi.addedKan(room,token,'m222+2','a0');assert.equal(roomApi.snapshot(room,b).pending.canRon,true);roomApi.respond(room,b,'ron');roomApi.respond(room,c,'pass');roomApi.respond(room,d,'pass');assert.equal(room.phase,'won');assert.equal(room.kanCount,0);assert.equal(room.melds[0][0].pattern,'m222+');assert.ok(room.result.yaku.some(y=>y.name==='槍槓'));
+});

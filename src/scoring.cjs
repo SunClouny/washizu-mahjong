@@ -14,7 +14,7 @@ function calculate(faces,winningTile,options={}) {
  const seat=options.seat??1;if(!Number.isInteger(seat)||seat<0||seat>3)throw new Error('自風が不正です');
  const method=options.method||'tsumo';if(!['tsumo','ron'].includes(method))throw new Error('和了方法が不正です');
  const direction=options.direction;if(method==='ron'&&!['+','=','-'].includes(direction))throw new Error('放銃者の位置が必要です');
- const param=M.Util.hule_param({rule:RULE,menfeng:seat,zhuangfeng:0,lizhi:options.riichi?1:0,baopai:options.doraIndicators||[],changbang:options.honba||0,lizhibang:options.riichiSticks||0});
+ const param=M.Util.hule_param({rule:RULE,menfeng:seat,zhuangfeng:0,lizhi:options.riichi?1:0,lingshang:!!options.rinshan,qianggang:!!options.chankan,baopai:options.doraIndicators||[],changbang:options.honba||0,lizhibang:options.riichiSticks||0});
  if(method==='tsumo')h.zimo(winningTile);
  const result=M.Util.hule(h,method==='ron'?winningTile+direction:null,param);
  if(!result||!result.hupai||result.hupai.length===0||!result.defen)return null;
@@ -26,10 +26,15 @@ function waits(faces,melds=[]) {
 }
 function callOptions(faces,melds,tile,direction,paishu){
  const h=hand13(faces,melds),p=tile+direction;
- return {chi:M.Game.get_chi_mianzi(RULE,h,p,paishu)||[],pon:M.Game.get_peng_mianzi(RULE,h,p,paishu)||[]};
+ return {chi:M.Game.get_chi_mianzi(RULE,h,p,paishu)||[],pon:M.Game.get_peng_mianzi(RULE,h,p,paishu)||[],kan:M.Game.get_gang_mianzi(RULE,h,p,paishu,0)||[]};
+}
+function ownKanOptions(faces,melds,riichi,paishu,kanCount){
+ if(!faces.length)return [];
+ const h=hand13(faces.slice(0,-1),melds);h.zimo(faces[faces.length-1]);h._lizhi=riichi;
+ return M.Game.get_gang_mianzi(RULE,h,null,paishu,kanCount)||[];
 }
 function callDiscards(faces,melds,lastMeld){
  const h=new M.Shoupai(faces);h._fulou=melds.slice();h._zimo=lastMeld;
  return M.Game.get_dapai(RULE,h)||[];
 }
-module.exports={calculate,waits,callOptions,callDiscards};
+module.exports={calculate,waits,callOptions,callDiscards,ownKanOptions};
