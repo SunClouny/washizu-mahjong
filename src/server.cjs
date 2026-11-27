@@ -12,6 +12,10 @@ function respond(res,status,value){res.writeHead(status,{'content-type':'applica
 function body(req){return new Promise((resolve,reject)=>{let data='';req.on('data',chunk=>{data+=chunk;if(data.length>8192){reject(new Error('入力が長すぎます'));req.destroy();}});req.on('end',()=>{try{resolve(JSON.parse(data||'{}'));}catch{reject(new Error('入力が不正です'));}});req.on('error',reject);});}
 function createServer(){return http.createServer(async(req,res)=>{try{
   const url=new URL(req.url,'http://localhost');
+  if(req.method==='GET'&&url.pathname==='/'){
+    const html=fs.readFileSync(path.join(__dirname,'../public/index.html'));
+    res.writeHead(200,{'content-type':'text/html; charset=utf-8','cache-control':'no-store','x-content-type-options':'nosniff'});return res.end(html);
+  }
   if(req.method==='GET'&&url.pathname==='/health'){return respond(res,200,{ok:true,stage:'development'});}
   if(req.method!=='POST'||!url.pathname.startsWith('/api/')) return respond(res,404,{error:'見つかりません'});
   const data=await body(req);
