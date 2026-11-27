@@ -31,3 +31,7 @@ test('画面から4人で東風戦の最後まで進行し順位を表示',async
  }
  await host.run('refresh()');assert.equal(host.run('state.phase'),'finished');assert.equal(host.run('state.rankings.length'),4);assert.ok(iterations<2500);
 });
+test('各視点で河は卓の四方向に分かれ、６列で並ぶ',async()=>{
+ const server=createServer(),clients=Array.from({length:4},()=>client(server));const [host,...others]=clients;host.doc.getElementById('name').value='親';await host.doc.getElementById('create').onclick();const code=host.run('session.code');for(let i=0;i<3;i++){others[i].doc.getElementById('name').value='子'+i;others[i].doc.getElementById('code').value=code;await others[i].doc.getElementById('join').onclick();}await host.run('refresh()');await host.doc.getElementById('start').onclick();
+ host.run("state.discards=Array.from({length:4},()=>Array.from({length:13},()=>({face:'m1',transparent:true})));render()");const rivers=host.doc.getElementById('players').children.filter(x=>x.className?.includes('river-'));assert.equal(rivers.length,4);assert.deepEqual(rivers.map(x=>x.className.split(' ').find(c=>c.startsWith('river-'))),['river-bottom','river-right','river-top','river-left']);assert.ok(rivers.every(r=>r.children.length===13));const html=fs.readFileSync(require('node:path').join(__dirname,'../public/index.html'),'utf8');assert.match(html,/grid-template-columns:repeat\(6,/);
+});
