@@ -42,3 +42,16 @@ test('親の和了は連荘し、子の和了は親が移動して東風戦を�
  room.phase='won';room.result={method:'tsumo',winner:1};roomApi.nextRound(room,token);assert.equal(room.round,2);assert.equal(room.dealer,1);assert.equal(room.honba,0);assert.equal(room.turn,1);
  room.round=4;room.dealer=3;room.phase='won';room.result={method:'ron',winner:0};roomApi.nextRound(room,token);assert.equal(room.phase,'finished');
 });
+test('チーに使う透明牌を選択でき、鳴いた直後の食い替えは禁止',()=>{
+ const {room,token}=roomApi.createRoom('親');const b=roomApi.join(room,'南'),c=roomApi.join(room,'西'),d=roomApi.join(room,'北');roomApi.start(room,token);
+ let faces=['m1','m3','m2','m8','m9','p1','p2','p3','s1','s2','s3','z2','z2'];room.hands[1]=faces.map((face,i)=>({id:'b'+i,face,transparent:i!==0}));
+ room.hands[0][0]={id:'throw',face:'m2',transparent:true};roomApi.discard(room,token,'throw');let s=roomApi.snapshot(room,b);assert.ok(s.pending.calls.chi.includes('m12-3'));
+ assert.throws(()=>roomApi.respond(room,b,'chi','m12-3',['b0','b2']));roomApi.respond(room,b,'chi','m12-3',['b0','b1']);roomApi.respond(room,c,'pass');roomApi.respond(room,d,'pass');
+ assert.equal(room.turn,1);assert.equal(room.hands[1].length,11);assert.equal(room.melds[1][0].pattern,'m12-3');assert.equal(room.melds[1][0].tiles[0].transparent,false);assert.equal(room.discards[0].length,0);
+ assert.throws(()=>roomApi.tsumo(room,b));assert.throws(()=>roomApi.discard(room,b,'b2'));roomApi.discard(room,b,'b3');assert.equal(room.phase,'response');
+});
+test('ポンはチーより優先し、合法な2枚以外を拒否',()=>{
+ const {room,token}=roomApi.createRoom('親');const b=roomApi.join(room,'南'),c=roomApi.join(room,'西'),d=roomApi.join(room,'北');roomApi.start(room,token);
+ const mk=(faces,prefix)=>faces.map((face,i)=>({id:prefix+i,face,transparent:true}));room.hands[1]=mk(['m1','m3','m7','m8','m9','p1','p2','p3','s1','s2','s3','z2','z2'],'b');room.hands[2]=mk(['m2','m2','m7','m8','m9','p1','p2','p3','s1','s2','s3','z3','z3'],'c');
+ room.hands[0][0]={id:'throw',face:'m2',transparent:true};roomApi.discard(room,token,'throw');roomApi.respond(room,b,'chi','m12-3',['b0','b1']);let pattern=roomApi.snapshot(room,c).pending.calls.pon[0];assert.ok(pattern);roomApi.respond(room,c,'pon',pattern,['c0','c1']);roomApi.respond(room,d,'pass');assert.equal(room.turn,2);assert.equal(room.melds[2][0].pattern,pattern);assert.equal(room.melds[1].length,0);
+});
