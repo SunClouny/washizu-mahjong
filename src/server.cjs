@@ -28,6 +28,7 @@ function createServer(){return http.createServer(async(req,res)=>{try{
   if(url.pathname==='/api/discard'){R.discard(room,data.token,data.tileId,data.riichi===true);return respond(res,200,R.snapshot(room,data.token));}
   if(url.pathname==='/api/respond'){R.respond(room,data.token,data.choice);return respond(res,200,R.snapshot(room,data.token));}
   if(url.pathname==='/api/tsumo'){R.tsumo(room,data.token);return respond(res,200,R.snapshot(room,data.token));}
+  if(url.pathname==='/api/next'){R.nextRound(room,data.token);return respond(res,200,R.snapshot(room,data.token));}
   return respond(res,404,{error:'見つかりません'});
  }catch(err){return respond(res,400,{error:err.message});}});}
 if(require.main===module){const port=Number(process.env.PORT||3000);createServer().listen(port,'127.0.0.1',()=>console.log(`開発サーバー: http://127.0.0.1:${port}`));}
