@@ -78,3 +78,32 @@ test('加カンを槍槓でき、点数精算はロンを優先',()=>{
  room.hands[1]=['m1','m3','p1','p2','p3','s1','s2','s3','z1','z1','z1','z2','z2'].map((face,i)=>({id:'b'+i,face,transparent:true}));
  roomApi.addedKan(room,token,'m222+2','a0');assert.equal(roomApi.snapshot(room,b).pending.canRon,true);roomApi.respond(room,b,'ron');roomApi.respond(room,c,'pass');roomApi.respond(room,d,'pass');assert.equal(room.phase,'won');assert.equal(room.kanCount,0);assert.equal(room.melds[0][0].pattern,'m222+');assert.ok(room.result.yaku.some(y=>y.name==='槍槓'));
 });
+test('手牌の並び替えは他家にも反映され、ツモ牌の識別を保つ',()=>{
+ const {room,token}=roomApi.createRoom('親');const b=roomApi.join(room,'南');roomApi.join(room,'西');roomApi.join(room,'北');roomApi.start(room,token);
+ const before=room.hands[0].map(t=>t.id),drawn=room.drawnIds[0],reordered=[before[13],...before.slice(0,13)];roomApi.reorder(room,token,reordered);assert.equal(room.hands[0][0].id,drawn);assert.deepEqual(roomApi.snapshot(room,token).hands[0].map(t=>t.id),reordered);
+ const seen=roomApi.snapshot(room,b).hands[0];assert.equal(seen.length,14);assert.equal(seen[0].transparent,room.hands[0][0].transparent);room.riichi[0]=true;assert.throws(()=>roomApi.discard(room,token,reordered[1]));roomApi.discard(room,token,drawn);assert.equal(room.phase,'response');
+});
+test('リーチ宣言牌でロンされた場合は供託を戻す',()=>{
+ const {room,token}=roomApi.createRoom('親');const b=roomApi.join(room,'南'),c=roomApi.join(room,'西'),d=roomApi.join(room,'北');roomApi.start(room,token);
+ const faces=['m1','m2','m3','p1','p2','p3','s1','s2','s3','z1','z1','z1','z2'];room.hands[0]=[...faces,'z2'].map((face,i)=>({id:'a'+i,face,transparent:true}));room.hands[1]=faces.map((face,i)=>({id:'b'+i,face,transparent:true}));
+ roomApi.discard(room,token,'a13',true);assert.equal(room.riichiSticks,1);roomApi.respond(room,b,'ron');roomApi.respond(room,c,'pass');roomApi.respond(room,d,'pass');
+ assert.equal(room.phase,'won');assert.equal(room.riichiSticks,0);assert.equal(room.riichi[0],false);assert.equal(room.scores.reduce((a,b)=>a+b,0),100000);assert.equal(room.scores[1]-25000,room.result.points);
+});
+test('鳴かれて河から消えた捨て牌もフリテン判定に残る',()=>{
+ const {room,token}=roomApi.createRoom('親');const b=roomApi.join(room,'南'),c=roomApi.join(room,'西'),d=roomApi.join(room,'北');roomApi.start(room,token);
+ const faces=['m1','m2','m3','p1','p2','p3','s1','s2','s3','z1','z1','z1','z2'];room.hands[1]=faces.map((face,i)=>({id:'b'+i,face,transparent:true}));room.discardHistory[1]=['z2'];room.hands[0][0]={id:'throw',face:'z2',transparent:true};roomApi.discard(room,token,'throw');
+ assert.equal(roomApi.snapshot(room,b).pending.canRon,false);assert.throws(()=>roomApi.respond(room,b,'ron'));
+});
+test('九種九牌の宣言と途中流局後の連荘',()=>{
+ const {room,token}=roomApi.createRoom('親');roomApi.join(room,'南');roomApi.join(room,'西');roomApi.join(room,'北');roomApi.start(room,token);
+ let faces=['m1','m9','p1','p9','s1','s9','z1','z2','z3','z4','m2','m3','m4','m5'];room.hands[0]=faces.map((face,i)=>({id:'a'+i,face,transparent:true}));assert.equal(roomApi.snapshot(room,token).canNineTerminals,true);roomApi.nineTerminals(room,token);assert.equal(room.result.reason,'九種九牌');roomApi.nextRound(room,token);assert.equal(room.round,1);assert.equal(room.honba,1);
+});
+test('四風連打はロンがなければ途中流局',()=>{
+ const {room,token}=roomApi.createRoom('親');const b=roomApi.join(room,'南'),c=roomApi.join(room,'西'),d=roomApi.join(room,'北');let tokens=[token,b,c,d];roomApi.start(room,token);
+ for(let seat=0;seat<4;seat++){let tile=room.hands[seat][0];tile.face='z1';roomApi.discard(room,tokens[seat],tile.id);for(let i=0;i<4;i++)if(i!==seat)roomApi.respond(room,tokens[i],'pass');}
+ assert.equal(room.phase,'exhausted');assert.equal(room.result.reason,'四風連打');
+});
+test('終局時に残った供託はトップへ渡し、順位を表示する',()=>{
+ const {room,token}=roomApi.createRoom('親');roomApi.join(room,'南');roomApi.join(room,'西');roomApi.join(room,'北');roomApi.start(room,token);room.round=4;room.dealer=3;room.scores=[24000,30000,23000,22000];room.riichiSticks=1;room.phase='exhausted';room.result={method:'draw',tenpai:[false,false,false,false]};roomApi.nextRound(room,token);
+ const view=roomApi.snapshot(room,token);assert.equal(view.phase,'finished');assert.equal(room.riichiSticks,0);assert.equal(view.rankings[0].seat,1);assert.equal(view.rankings[0].score,31000);assert.equal(room.scores.reduce((a,b)=>a+b),100000);
+});
