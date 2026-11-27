@@ -14,7 +14,7 @@ function calculate(faces,winningTile,options={}) {
  const seat=options.seat??1;if(!Number.isInteger(seat)||seat<0||seat>3)throw new Error('自風が不正です');
  const method=options.method||'tsumo';if(!['tsumo','ron'].includes(method))throw new Error('和了方法が不正です');
  const direction=options.direction;if(method==='ron'&&!['+','=','-'].includes(direction))throw new Error('放銃者の位置が必要です');
- const param=M.Util.hule_param({rule:RULE,menfeng:seat,zhuangfeng:0,lizhi:options.riichi?1:0,lingshang:!!options.rinshan,qianggang:!!options.chankan,baopai:options.doraIndicators||[],changbang:options.honba||0,lizhibang:options.riichiSticks||0});
+ const param=M.Util.hule_param({rule:RULE,menfeng:seat,zhuangfeng:0,lizhi:options.doubleRiichi?2:options.riichi?1:0,yifa:!!options.ippatsu,haidi:options.lastTile||0,lingshang:!!options.rinshan,qianggang:!!options.chankan,baopai:options.doraIndicators||[],fubaopai:options.uraIndicators||null,changbang:options.honba||0,lizhibang:options.riichiSticks||0});
  if(method==='tsumo')h.zimo(winningTile);
  const result=M.Util.hule(h,method==='ron'?winningTile+direction:null,param);
  if(!result||!result.hupai||result.hupai.length===0||!result.defen)return null;
