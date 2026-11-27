@@ -16,3 +16,10 @@ test('手番と所持牌を検証し次の人にツモを渡す',()=>{
   const id=room.hands[0][0].id; assert.throws(()=>roomApi.discard(room,b,id)); assert.throws(()=>roomApi.discard(room,token,'bad-id'));
   roomApi.discard(room,token,id); assert.equal(room.turn,1); assert.equal(room.hands[0].length,13);assert.equal(room.hands[1].length,14);assert.equal(room.discards[0].length,1);
 });
+test('ツモ時に役と点数を確定し、他人による申告を拒否',()=>{
+  const {room,token}=roomApi.createRoom('親');const b=roomApi.join(room,'南');roomApi.join(room,'西');roomApi.join(room,'北');roomApi.start(room,token);
+  const faces=['m1','m2','m3','p1','p2','p3','s1','s2','s3','z1','z1','z1','z2','z2'];room.hands[0]=faces.map((face,i)=>({id:'test'+i,face,transparent:i%4!==0}));
+  assert.throws(()=>roomApi.tsumo(room,b));roomApi.tsumo(room,token);
+  assert.equal(room.phase,'won');assert.equal(room.result.winner,0);assert.equal(room.scores.reduce((a,b)=>a+b,0),100000);assert.ok(room.scores[0]>25000);
+  assert.throws(()=>roomApi.tsumo(room,token));
+});

@@ -1,6 +1,7 @@
 'use strict';
 const crypto = require('node:crypto');
 const {makeWall, visibleHand} = require('./tiles.cjs');
+const {calculate} = require('./scoring.cjs');
 const digest = token => crypto.createHash('sha256').update(token).digest('hex');
 const makeToken = () => crypto.randomBytes(32).toString('base64url');
 function cleanName(name) {
@@ -9,7 +10,7 @@ function cleanName(name) {
 }
 function createRoom(name) {
   const token=makeToken();
-  return { room:{version:1, phase:'lobby',players:[{name:cleanName(name),tokenHash:digest(token)}],hands:[],discards:[],wall:[],turn:null}, token };
+  return { room:{version:1, phase:'lobby',players:[{name:cleanName(name),tokenHash:digest(token)}],hands:[],discards:[],wall:[],turn:null,scores:[25000,25000,25000,25000],result:null}, token };
 }
 function seatFor(room, token) {
   if (typeof token !== 'string' || !token) throw new Error('参加者を確認できません');
@@ -40,8 +41,18 @@ function discard(room, token, tileId) {
   else {room.turn=(seat+1)%4;room.hands[room.turn].push(room.wall.pop());}
   room.version++;
 }
+function tsumo(room, token) {
+  const seat=seatFor(room,token);
+  if(room.phase!=='playing'||room.turn!==seat) throw new Error('あなたのツモ番ではありません');
+  const hand=room.hands[seat];
+  if(hand.length!==14) throw new Error('和了できる手牌ではありません');
+  const result=calculate(hand.slice(0,13).map(t=>t.face),hand[13].face,{seat});
+  if(!result) throw new Error('和了できる役がありません');
+  room.scores=room.scores.map((score,i)=>score+result.payments[i]);
+  room.result={winner:seat,method:'tsumo',...result};room.phase='won';room.turn=null;room.version++;
+}
 function snapshot(room, token) {
   const seat=seatFor(room,token);
-  return {version:room.version,phase:room.phase,players:room.players.map(p=>({name:p.name})),seat,turn:room.turn,wallRemaining:room.wall.length, hands:room.hands.map((hand,i)=>visibleHand(hand,i===seat)),discards:room.discards.map(p=>p.map(t=>({face:t.face,transparent:t.transparent})))};
+  return {version:room.version,phase:room.phase,players:room.players.map(p=>({name:p.name})),seat,turn:room.turn,wallRemaining:room.wall.length,scores:room.scores,result:room.result, hands:room.hands.map((hand,i)=>visibleHand(hand,i===seat)),discards:room.discards.map(p=>p.map(t=>({face:t.face,transparent:t.transparent})))};
 }
-module.exports={createRoom,join,start,discard,snapshot};
+module.exports={createRoom,join,start,discard,tsumo,snapshot};
