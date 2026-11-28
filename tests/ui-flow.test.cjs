@@ -1,9 +1,9 @@
 const test=require('node:test');const assert=require('node:assert/strict');const fs=require('node:fs');const vm=require('node:vm');const {Readable}=require('node:stream');const {createServer}=require('../src/server.cjs');
-class Element {constructor(){this.children=[];this.value='';this.textContent='';this.hidden=false;this.disabled=false;}append(...x){this.children.push(...x)}replaceChildren(...x){this.children=x}setAttribute(){} }
+class Element {constructor(){this.children=[];this.value='';this.textContent='';this.hidden=false;this.disabled=false;this.style={setProperty:(k,v)=>{this.style[k]=v}};this.clientWidth=600;}append(...x){this.children.push(...x)}replaceChildren(...x){this.children=x}setAttribute(){} }
 function client(server){
  const elements=new Map();const document={getElementById(id){if(!elements.has(id))elements.set(id,new Element());return elements.get(id)},createElement(){return new Element()},createElementNS(){return new Element()}};const storage=new Map();
  const fetch=async(url,options)=>new Promise(resolve=>{const req=Readable.from([options.body]);req.method=options.method;req.url=url;const res={writeHead(status){this.status=status},end(data){resolve({ok:this.status<400,json:async()=>JSON.parse(data)})}};server.emit('request',req,res)});
- const context=vm.createContext({document,fetch,localStorage:{getItem:k=>storage.get(k)||null,setItem:(k,v)=>storage.set(k,v),removeItem:k=>storage.delete(k)},navigator:{clipboard:{writeText:async()=>{}}},setInterval:()=>0,console,Map,Set});
+ const context=vm.createContext({document,window:{innerWidth:900},fetch,localStorage:{getItem:k=>storage.get(k)||null,setItem:(k,v)=>storage.set(k,v),removeItem:k=>storage.delete(k)},navigator:{clipboard:{writeText:async()=>{}}},setInterval:()=>0,console,Map,Set});
  const html=fs.readFileSync(require('node:path').join(__dirname,'../public/index.html'),'utf8');vm.runInContext(html.match(/<script>([\s\S]*?)<\/script>/)[1],context);
  return {doc:document,run:code=>vm.runInContext(code,context)};
 }
@@ -35,3 +35,5 @@ test('各視点で河は卓の四方向に分かれ、６列で並ぶ',async()=>
  const server=createServer(),clients=Array.from({length:4},()=>client(server));const [host,...others]=clients;host.doc.getElementById('name').value='親';await host.doc.getElementById('create').onclick();const code=host.run('session.code');for(let i=0;i<3;i++){others[i].doc.getElementById('name').value='子'+i;others[i].doc.getElementById('code').value=code;await others[i].doc.getElementById('join').onclick();}await host.run('refresh()');await host.doc.getElementById('start').onclick();
  host.run("state.discards=Array.from({length:4},()=>Array.from({length:13},()=>({face:'m1',transparent:true})));render()");const rivers=host.doc.getElementById('players').children.filter(x=>x.className?.includes('river-'));assert.equal(rivers.length,4);assert.deepEqual(rivers.map(x=>x.className.split(' ').find(c=>c.startsWith('river-'))),['river-bottom','river-right','river-top','river-left']);assert.ok(rivers.every(r=>r.children.length===13));const html=fs.readFileSync(require('node:path').join(__dirname,'../public/index.html'),'utf8');assert.match(html,/grid-template-columns:repeat\(6,/);
 });
+
+test('手牌サイズを調整し横幅に合わせられる',()=>{const c=client(createServer()),size=c.doc.getElementById('handSize'),hand=c.doc.getElementById('hand');size.value='60';size.oninput();assert.equal(hand.style['--hand-width'],'60px');c.doc.getElementById('handFit').onclick();assert.equal(hand.style['--hand-width'],'39px');});
