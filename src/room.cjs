@@ -49,7 +49,10 @@ function advanceCpu(room) {
 function leave(room, token) {
   const seat=seatFor(room,token);
   if(room.phase!=='lobby') throw new Error('対局中は退室できません。画面を閉じても再び参加できます');
-  room.players.splice(seat,1); room.version++;
+  room.players.splice(seat,1);
+  if(room.players.every(p=>p.cpuToken)) room.players.length=0;
+  else if(seat===0&&room.players[0].cpuToken){const next=room.players.findIndex(p=>!p.cpuToken);room.players.unshift(room.players.splice(next,1)[0]);}
+  room.version++;
 }
 function start(room, token, randomInt) {
   if(seatFor(room,token)!==0) throw new Error('開始できるのは部屋の作成者です');
