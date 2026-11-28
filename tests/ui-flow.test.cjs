@@ -53,3 +53,42 @@ test('手牌を選んで移動先の牌を押すと一度で移動する',async(
 });
 
 test('CPU戦開始ボタンで部屋作成から配牌まで進む',async()=>{const c=client(createServer());c.doc.getElementById('name').value='親';await c.doc.getElementById('cpuGame').onclick();assert.equal(c.run('state.phase'),'playing');assert.equal(c.run('state.players.length'),4);assert.equal(c.doc.getElementById('hand').children.length,14);assert.equal(c.run('state.players[1].name'),'CPU 1')});
+
+test('自席を含む4人の副露を各家の右隅に置き、両隣の名札は卓外に表示する',async()=>{
+ const c=client(createServer());
+ c.doc.getElementById('name').value='親';
+ await c.doc.getElementById('cpuGame').onclick();
+ c.run("state.melds=Array.from({length:4},()=>[{pattern:'m222=',tiles:[1,2,3].map(()=>({face:'m2',transparent:true}))}]);");
+ for(let seat=0;seat<4;seat++){
+   c.run('state.seat='+seat+';render()');
+   const corners=c.doc.getElementById('players').children.filter(x=>x.className?.startsWith('meld-corner'));
+   assert.equal(corners.length,4);
+   assert.equal(corners[seat].className,'meld-corner meld-bottom');
+   const names=c.doc.getElementById('sideScores').children;
+   assert.equal(names.length,2);
+   assert.ok(names.find(x=>x.className.includes('seat-right')).children[0].textContent.startsWith('下家'));
+   assert.ok(names.find(x=>x.className.includes('seat-left')).children[0].textContent.startsWith('上家'));
+ }
+});
+
+test('チーの実牌とポン・大明カンの指示牌、加カンの重なり、暗カンの伏せ牌を描き分ける',()=>{
+ const c=client(createServer());
+ const group=(pattern,faces,closed=false)=>c.run('meldCorner("bottom","親",'+JSON.stringify([{
+   pattern,closed,tiles:faces.split(' ').map((face,i)=>({face,transparent:i!==2}))
+ }])+').children[0].children');
+ const called=slots=>Array.from(slots).findIndex(s=>s.className.includes('called'));
+ const chi=group('m12-3','m3 m1 m2');
+ assert.equal(called(chi),0);
+ assert.equal(chi[0].children[0].textContent,'二');
+ assert.ok(!chi[0].children[0].className.includes('clear'));
+ assert.equal(chi[1].children[0].textContent,'一');
+ for(const [from,pon,kan] of [['-',0,0],['=',1,1],['+',2,3]]){
+   assert.equal(called(group('m222'+from,'m2 m2 m2')),pon);
+   assert.equal(called(group('m2222'+from,'m2 m2 m2 m2')),kan);
+   const slots=group('m222'+from+'2','m2 m2 m2 m2');
+   assert.equal(slots.length,3);
+   assert.equal(slots[pon].children.length,2);
+ }
+ const closed=group('m2222','m2 m2 m2 m2',true);
+ assert.deepEqual(Array.from(closed,s=>s.children[0].textContent),['◆','二','二','◆']);
+});
