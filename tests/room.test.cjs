@@ -34,6 +34,7 @@ test('ロン判定と打牌後の応答、頭ハネ精算',()=>{
 test('リーチには門前テンパイを要し、1000点を供託',()=>{
  const {room,token}=roomApi.createRoom('親');roomApi.join(room,'南');roomApi.join(room,'西');roomApi.join(room,'北');roomApi.start(room,token);
  let faces=['m1','m2','m3','p1','p2','p3','s1','s2','s3','z1','z1','z1','z2','z3'];room.hands[0]=faces.map((face,i)=>({id:'a'+i,face,transparent:true}));
+ assert.ok(roomApi.snapshot(room,token).riichiDiscards.includes('a13'));assert.ok(!roomApi.snapshot(room,token).riichiDiscards.includes('a0'));
  roomApi.discard(room,token,'a13',true);assert.equal(room.riichi[0],true);assert.equal(room.scores[0],24000);assert.equal(room.riichiSticks,1);
 });
 test('親の和了は連荘し、子の和了は親が移動して東風戦を終了',()=>{
