@@ -24,6 +24,28 @@ function join(room,name) {
   const token=makeToken(); room.players.push({name:cleanName(name),tokenHash:digest(token)}); room.version++;
   return token;
 }
+function addCpu(room,token) {
+  if(seatFor(room,token)!==0||room.phase!=='lobby') throw new Error('部屋の作成者だけがCPUを追加できます');
+  if(room.players.length>=4) throw new Error('部屋は満員です');
+  const cpuToken=makeToken(); room.players.push({name:'CPU '+(room.players.filter(p=>p.cpuToken).length+1),tokenHash:digest(cpuToken),cpuToken}); room.version++;
+}
+function advanceCpu(room) {
+  for(let steps=0;steps<200;steps++) {
+    if(room.phase==='response'&&room.pending) {
+      const i=room.players.findIndex((p,n)=>p.cpuToken&&n!==room.pending.discarder&&!room.pending.answers[n]);
+      if(i<0) break;
+      const token=room.players[i].cpuToken;
+      respond(room,token,ronResult(room,i)?'ron':'pass');
+    } else if(room.phase==='playing'&&room.players[room.turn]?.cpuToken) {
+      const seat=room.turn,token=room.players[seat].cpuToken;
+      try { tsumo(room,token); continue; } catch(e) { if(e.message!=='和了できる役がありません'&&e.message!=='和了できる手牌ではありません') throw e; }
+      const hand=room.hands[seat], candidates=hand.filter(t=>!room.allowedDiscards||room.allowedDiscards.includes(t.face));
+      const score=t=>hand.reduce((sum,u)=>{if(u.id===t.id)return sum;if(u.face===t.face)return sum+4;if(t.face[0]!=='z'&&u.face[0]===t.face[0]){let d=Math.abs(+u.face[1]- +t.face[1]);return sum+(d===1?2:d===2?1:0)}return sum},0);
+      const tile=room.riichi[seat]?hand.find(t=>t.id===room.drawnIds[seat]):candidates.reduce((a,b)=>score(a)<=score(b)?a:b);
+      discard(room,token,tile.id);
+    } else break;
+  }
+}
 function leave(room, token) {
   const seat=seatFor(room,token);
   if(room.phase!=='lobby') throw new Error('対局中は退室できません。画面を閉じても再び参加できます');
@@ -189,4 +211,4 @@ function snapshot(room, token) {
   const rankings=room.phase==='finished'?room.scores.map((score,seat)=>({score,seat})).sort((a,b)=>b.score-a.score||a.seat-b.seat):null;
   return {version:room.version,phase:room.phase,players:room.players.map(p=>({name:p.name})),seat,turn:room.turn,wallRemaining:room.wall.length,scores:room.scores,rankings,result:room.result,round:room.round,dealer:room.dealer,honba:room.honba,riichi:room.riichi,riichiSticks:room.riichiSticks,dora:room.dora,doraIndicators:room.doraIndicators,canNineTerminals:room.phase==='playing'&&canNineTerminals(room,seat),closedKans:ownKans.filter(m=>/^[mpsz]\d{4}$/.test(m)),addedKans:ownKans.filter(m=>/[+\-=]\d$/.test(m)),melds:room.melds,pending:room.pending?{kind:room.pending.kind||'discard',discarder:room.pending.discarder,tile:room.pending.tile.face,answered:!!room.pending.answers[seat],canRon:!!ronResult(room,seat),calls:optionsFor(room,seat)}:null, hands:room.hands.map((hand,i)=>visibleHand(hand,i===seat)),discards:room.discards.map(p=>p.map(t=>({face:t.face,transparent:t.transparent})))};
 }
-module.exports={createRoom,join,leave,start,discard,reorder,respond,tsumo,closedKan,addedKan,nineTerminals,nextRound,snapshot};
+module.exports={createRoom,join,addCpu,advanceCpu,leave,start,discard,reorder,respond,tsumo,closedKan,addedKan,nineTerminals,nextRound,snapshot};
