@@ -36,5 +36,5 @@ function createServer(){return http.createServer(async(req,res)=>{try{
   if(url.pathname==='/api/next'){R.nextRound(room,data.token);return respond(res,200,R.snapshot(room,data.token));}
   return respond(res,404,{error:'見つかりません'});
  }catch(err){return respond(res,400,{error:err.message});}});}
-if(require.main===module){const port=Number(process.env.PORT||3000);createServer().listen(port,'127.0.0.1',()=>console.log(`開発サーバー: http://127.0.0.1:${port}`));}
+if(require.main===module){const port=Number(process.env.PORT||3000),host=process.env.RENDER?'0.0.0.0':'127.0.0.1';createServer().listen(port,host,()=>console.log(`サーバー: ${host}:${port}`));}
 module.exports={createServer};
