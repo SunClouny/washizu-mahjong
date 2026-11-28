@@ -122,3 +122,100 @@ test('四槓散了は嶺上打牌へのロン機会のあとに成立',()=>{
 test('親の配牌直後のツモには天和が成立',()=>{
  const {room,token}=roomApi.createRoom('親');roomApi.join(room,'南');roomApi.join(room,'西');roomApi.join(room,'北');roomApi.start(room,token);const faces=['m1','m2','m3','p1','p2','p3','s1','s2','s3','z1','z1','z1','z2','z2'];room.hands[0]=faces.map((face,i)=>({id:'a'+i,face,transparent:true}));room.drawnIds[0]='a13';roomApi.tsumo(room,token);assert.ok(room.result.yaku.some(y=>y.name==='天和'));
 });
+
+function rulesTable(){
+  const {room,token}=roomApi.createRoom('東');
+  const tokens=[token,...['南','西','北'].map(name=>roomApi.join(room,name))];
+  roomApi.start(room,token,()=>0);
+  return {room,tokens};
+}
+function testHand(faces,prefix){
+  return faces.split(' ').map((face,i)=>({face,id:prefix+i,transparent:true}));
+}
+function passRemaining(room,tokens){
+  const pending=room.pending;
+  for(let i=0;i<4;i++)if(i!==pending.discarder&&!pending.answers[i])roomApi.respond(room,tokens[i],'pass');
+}
+test('片アガリの役なし側を見送った同巡は役あり側もロンできず、自分の打牌後は解除する',()=>{
+  const {room,tokens}=rulesTable();
+  room.melds[3]=[{pattern:'p345-',tiles:[]}];
+  room.hands[3]=testHand('m2 m3 s2 s3 s4 p6 p7 p8 m5 m5','n');
+  const discardFace=(seat,face)=>{
+    const id=room.drawnIds[seat];
+    room.hands[seat].find(t=>t.id===id).face=face;
+    roomApi.discard(room,tokens[seat],id);
+  };
+  discardFace(0,'m1');
+  assert.equal(roomApi.snapshot(room,tokens[3]).pending.canRon,false);
+  passRemaining(room,tokens);
+  discardFace(1,'m4');
+  assert.throws(()=>roomApi.respond(room,tokens[3],'ron'),/ロンできません/);
+  passRemaining(room,tokens);
+  discardFace(2,'z5');
+  passRemaining(room,tokens);
+  discardFace(3,'z6');
+  passRemaining(room,tokens);
+  discardFace(0,'m4');
+  assert.equal(roomApi.snapshot(room,tokens[3]).pending.canRon,true);
+});
+test('最後の牌を引いた後は鳴けず、嶺上ツモと海底を重複させない',()=>{
+  const {room,tokens}=rulesTable();
+  room.hands[0]=testHand('m1 m1 m1 m1 p1 p2 p3 s1 s2 s3 z1 z1 z1 z2','a');
+  room.wall=room.wall.slice(0,1);
+  room.deadWall[0]={face:'z2',id:'replacement',transparent:true};
+  roomApi.closedKan(room,tokens[0],'m1111',['a0','a1','a2','a3']);
+  assert.equal(roomApi.snapshot(room,tokens[0]).canTsumo,true);
+  roomApi.tsumo(room,tokens[0]);
+  assert.ok(room.result.yaku.some(y=>y.name==='嶺上開花'));
+  assert.ok(!room.result.yaku.some(y=>y.name==='海底摸月'));
+  const last=rulesTable();
+  last.room.wall=[];
+  last.room.hands[1]=testHand('m2 m2 m2 m1 m3 p3 p4 p5 s2 s3 s4 z6 z6','b');
+  const tile=last.room.hands[0][0];tile.face='m2';
+  roomApi.discard(last.room,last.tokens[0],tile.id);
+  assert.deepEqual(roomApi.snapshot(last.room,last.tokens[1]).pending.calls,{chi:[],pon:[],kan:[]});
+});
+test('リーチ宣言牌がポンされたら次の捨て牌を横向きにし、理牌後もツモ切りだけを許可する',()=>{
+  const {room,tokens}=rulesTable();
+  room.hands[0]=testHand('m1 m2 m3 p1 p2 p3 s1 s2 s3 z1 z1 z1 z2 z3','a');
+  room.hands[3]=testHand('z3 z3 m6 m7 m8 p4 p5 p6 s4 s5 s6 z4 z4','d');
+  roomApi.discard(room,tokens[0],'a13',true);
+  assert.ok(roomApi.snapshot(room,tokens[3]).discards[0][0].riichiDiscard);
+  const pon=roomApi.snapshot(room,tokens[3]).pending.calls.pon[0];
+  roomApi.respond(room,tokens[3],'pon',pon,['d0','d1']);
+  passRemaining(room,tokens);
+  assert.equal(roomApi.snapshot(room,tokens[3]).canTsumo,false);
+  roomApi.discard(room,tokens[3],'d11');
+  passRemaining(room,tokens);
+  const id=room.drawnIds[0];
+  roomApi.reorder(room,tokens[0],room.hands[0].map(t=>t.id).reverse());
+  assert.deepEqual(roomApi.snapshot(room,tokens[0]).discardableIds,[id]);
+  assert.throws(()=>roomApi.discard(room,tokens[0],'a0'),/ツモ牌/);
+  roomApi.discard(room,tokens[0],id);
+  assert.ok(roomApi.snapshot(room,tokens[3]).discards[0][0].riichiDiscard);
+});
+test('加カンへの槍槓では成立前の一発を残す',()=>{
+  const {room,tokens}=rulesTable();
+  room.melds[0]=[{pattern:'m222+',tiles:[]}];
+  room.hands[0]=testHand('m2 m7 m8 m9 p1 p2 p3 s1 s2 s3 z2','a');
+  room.hands[1]=testHand('m1 m3 p1 p2 p3 s1 s2 s3 z1 z1 z1 z2 z2','b');
+  room.riichi[1]=room.ippatsu[1]=true;
+  roomApi.addedKan(room,tokens[0],'m222+2','a0');
+  roomApi.respond(room,tokens[1],'ron');
+  passRemaining(room,tokens);
+  assert.ok(room.result.yaku.some(y=>y.name==='槍槓'));
+  assert.ok(room.result.yaku.some(y=>y.name==='一発'));
+  assert.equal(room.kanCount,0);
+});
+test('CPUも門前テンパイならリーチし、供託を積む',()=>{
+  const {room,token}=roomApi.createRoom('人間');
+  for(let i=0;i<3;i++)roomApi.addCpu(room,token);
+  roomApi.start(room,token,()=>0);
+  room.turn=1;
+  room.hands[1]=testHand('m1 m2 m3 p1 p2 p3 s1 s2 s3 z1 z1 z1 z2 z3','b');
+  room.drawnIds[1]='b13';
+  roomApi.advanceCpu(room);
+  assert.ok(room.riichi[1]);
+  assert.equal(room.riichiSticks,1);
+  assert.equal(room.scores[1],24000);
+});

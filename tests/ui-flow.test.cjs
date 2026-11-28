@@ -30,6 +30,16 @@ test('画面から4人で東風戦の最後まで進行し順位を表示',async
    }else if(host.run("state.phase==='won'||state.phase==='exhausted'")){await host.doc.getElementById('next').onclick();}
  }
  await host.run('refresh()');assert.equal(host.run('state.phase'),'finished');assert.equal(host.run('state.rankings.length'),4);assert.ok(iterations<2500);
+ const standings=host.run('JSON.stringify(state.rankings)');
+ await host.doc.getElementById('leave').onclick();
+ assert.equal(host.run('session'),null);
+ for(const c of others){
+   await c.run('refresh()');
+   assert.equal(c.run('JSON.stringify(state.rankings)'),standings);
+   await c.doc.getElementById('leave').onclick();
+ }
+ await host.doc.getElementById('cpuGame').onclick();
+ assert.equal(host.run('state.phase'),'playing');
 });
 test('各視点で河は卓の四方向に分かれ、６列で並ぶ',async()=>{
  const server=createServer(),clients=Array.from({length:4},()=>client(server));const [host,...others]=clients;host.doc.getElementById('name').value='親';await host.doc.getElementById('create').onclick();const code=host.run('session.code');for(let i=0;i<3;i++){others[i].doc.getElementById('name').value='子'+i;others[i].doc.getElementById('code').value=code;await others[i].doc.getElementById('join').onclick();}await host.run('refresh()');await host.doc.getElementById('start').onclick();

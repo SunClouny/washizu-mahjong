@@ -22,7 +22,11 @@ function calculate(faces,winningTile,options={}) {
 }
 function waits(faces,melds=[]) {
  const hand=hand13(faces,melds);
- return M.Util.xiangting(hand)===0 ? M.Util.tingpai(hand) : [];
+ if(M.Util.xiangting(hand)!==0)return [];
+ const candidates=M.Util.tingpai(hand);
+ if(!melds.length)return candidates;
+ const ownTiles=faces.concat(melds.flatMap(m=>(m.match(/\d/g)||[]).map(n=>m[0]+n)));
+ return candidates.filter(face=>ownTiles.filter(p=>p===face).length<4);
 }
 function callOptions(faces,melds,tile,direction,paishu){
  const h=hand13(faces,melds),p=tile+direction;

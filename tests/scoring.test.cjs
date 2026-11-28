@@ -4,3 +4,10 @@ test('完成していない手を和了としない',()=>{let r=calculate(['m1',
 test('5枚目の牌や無効な入力を拒否',()=>{assert.throws(()=>calculate(['m1','m1','m1','m1','p1','p2','p3','s1','s2','s3','z1','z1','z1'],'m1'));assert.throws(()=>calculate([], 'm1'));});
 test('チー後の手牌も役と点数を計算',()=>{let r=calculate(['p1','p2','p3','s1','s2','s3','z1','z1','z1','z2'],'z2',{seat:1,melds:['m12-3']});assert.equal(r.han,3);assert.equal(r.points,5200);assert.ok(r.yaku.some(y=>y.name==='場風 東'));assert.ok(!r.yaku.some(y=>y.name==='門前清自摸和'));});
 test('ダブルリーチ・一発・裏ドラを得点へ反映',()=>{const faces=['m1','m2','m3','p1','p2','p3','s1','s2','s3','z1','z1','z1','z2'];const r=calculate(faces,'z2',{seat:1,riichi:true,doubleRiichi:true,ippatsu:true,uraIndicators:['z4']});assert.ok(r.yaku.some(y=>y.name==='ダブル立直'));assert.ok(r.yaku.some(y=>y.name==='一発'));assert.ok(r.yaku.some(y=>y.name==='裏ドラ'));});
+
+test('自分の副露を含めて5枚目しか待てない形はノーテン',()=>{
+ const {waits}=require('../src/scoring.cjs');
+ const faces=['m1','p2','p3','p4','s3','s4','s5','z4','z4','z4'];
+ assert.deepEqual(waits(faces,['m111+']),[]);
+ assert.deepEqual(waits(faces,['m999+']),['m1']);
+});

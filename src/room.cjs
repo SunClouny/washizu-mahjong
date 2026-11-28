@@ -41,13 +41,21 @@ function advanceCpu(room) {
       try { tsumo(room,token); continue; } catch(e) { if(e.message!=='和了できる役がありません'&&e.message!=='和了できる手牌ではありません') throw e; }
       const hand=room.hands[seat], candidates=hand.filter(t=>!room.allowedDiscards||room.allowedDiscards.includes(t.face));
       const score=t=>hand.reduce((sum,u)=>{if(u.id===t.id)return sum;if(u.face===t.face)return sum+4;if(t.face[0]!=='z'&&u.face[0]===t.face[0]){let d=Math.abs(+u.face[1]- +t.face[1]);return sum+(d===1?2:d===2?1:0)}return sum},0);
-      const tile=room.riichi[seat]?hand.find(t=>t.id===room.drawnIds[seat]):candidates.reduce((a,b)=>score(a)<=score(b)?a:b);
-      discard(room,token,tile.id);
+      const riichiChoices=riichiTiles(room,seat);
+      const discards=riichiChoices.length?riichiChoices:candidates;
+      const tile=room.riichi[seat]?hand.find(t=>t.id===room.drawnIds[seat]):discards.reduce((a,b)=>score(a)<=score(b)?a:b);
+      discard(room,token,tile.id,riichiChoices.length>0);
     } else break;
   }
 }
 function leave(room, token) {
   const seat=seatFor(room,token);
+  if(room.phase==='finished'){
+    room.players[seat].tokenHash=null;
+    if(room.players.every(p=>p.cpuToken||!p.tokenHash))room.players.length=0;
+    room.version++;
+    return;
+  }
   if(room.phase!=='lobby') throw new Error('対局中は退室できません。画面を閉じても再び参加できます');
   room.players.splice(seat,1);
   if(room.players.every(p=>p.cpuToken)) room.players.length=0;
@@ -60,7 +68,7 @@ function start(room, token, randomInt) {
   deal(room,randomInt);
 }
 function deal(room,randomInt){
-  const wall=makeWall(randomInt); room.hands=Array.from({length:4},()=>[]); room.discards=Array.from({length:4},()=>[]);room.discardHistory=Array.from({length:4},()=>[]);room.riverCalled=[false,false,false,false];
+  const wall=makeWall(randomInt); room.hands=Array.from({length:4},()=>[]); room.discards=Array.from({length:4},()=>[]);room.discardHistory=Array.from({length:4},()=>[]);room.riverCalled=[false,false,false,false];room.markNextDiscard=[false,false,false,false];
   for(let i=0;i<13;i++) for(let p=0;p<4;p++) room.hands[p].push(wall.pop());
   for(const hand of room.hands)hand.sort((a,b)=>a.face.localeCompare(b.face));
   room.deadWall=wall.splice(0,14);room.wall=wall;room.kanCount=0;room.kanOwners=[];room.abortAfterDiscard=false;room.doraIndicators=[room.deadWall[4].face];room.rinshan=false;room.uninterrupted=true;room.doubleRiichi=[false,false,false,false];room.ippatsu=[false,false,false,false];room.melds=Array.from({length:4},()=>[]);room.drawnIds=[null,null,null,null];room.afterCall=false;room.allowedDiscards=null;room.riichi=[false,false,false,false];room.furiten=[false,false,false,false];room.pending=null;room.result=null;room.dora=room.doraIndicators[0];const drawn=room.wall.pop();room.hands[room.dealer].push(drawn);room.drawnIds[room.dealer]=drawn.id; room.turn=room.dealer; room.phase='playing'; room.version++;
@@ -70,7 +78,7 @@ function uraFor(room,seat){return room.riichi[seat]?room.doraIndicators.map((_,i
 function replacementDraw(room,seat){
   if(room.kanCount>=4||room.wall.length===0)throw new Error('これ以上カンできません');
   const tile=room.deadWall[room.kanCount];room.kanCount++;room.kanOwners.push(seat);room.abortAfterDiscard=room.kanCount===4&&new Set(room.kanOwners).size>1;room.doraIndicators.push(room.deadWall[4+2*room.kanCount].face);
-  room.wall.pop();room.hands[seat].push(tile);room.drawnIds[seat]=tile.id;room.rinshan=true;room.turn=seat;room.afterCall=false;room.allowedDiscards=null;room.phase='playing';
+  room.deadWall[room.kanCount-1]=room.wall.shift();room.hands[seat].push(tile);room.drawnIds[seat]=tile.id;room.rinshan=true;room.turn=seat;room.afterCall=false;room.allowedDiscards=null;room.phase='playing';
 }
 function drawnLast(room,seat){const hand=room.hands[seat],id=room.drawnIds[seat],drawn=hand.find(t=>t.id===id);return drawn?[...hand.filter(t=>t.id!==id),drawn]:hand.slice();}
 function reorder(room,token,ids){
@@ -84,13 +92,16 @@ function applyPayment(room,payments){room.scores=room.scores.map((score,i)=>scor
 function abortRound(room,reason){room.result={method:'abort',reason};room.phase='exhausted';room.turn=null;}
 function canNineTerminals(room,seat){return room.phase==='playing'&&room.turn===seat&&!room.afterCall&&room.uninterrupted&&room.discardHistory[seat].length===0&&new Set(room.hands[seat].map(t=>t.face).filter(p=>p[0]==='z'||p[1]==='1'||p[1]==='9')).size>=9;}
 function nineTerminals(room,token){const seat=seatFor(room,token);if(!canNineTerminals(room,seat))throw new Error('九種九牌を宣言できません');abortRound(room,'九種九牌');room.version++;}
+function canDiscardTile(room,seat,tile){
+  if(room.riichi[seat])return tile.id===room.drawnIds[seat];
+  return !room.allowedDiscards||room.allowedDiscards.includes(tile.face);
+}
 function discard(room, token, tileId, declareRiichi=false) {
   const seat=seatFor(room,token);
   if(room.phase!=='playing'||room.turn!==seat) throw new Error('あなたの番ではありません');
   const index=room.hands[seat].findIndex(t=>t.id===tileId);
   if(index<0) throw new Error('手牌にない牌です');
-  if(room.allowedDiscards&&!room.allowedDiscards.includes(room.hands[seat][index].face))throw new Error('その牌は鳴いた直後に捨てられません');
-  if(room.riichi[seat]&&tileId!==room.drawnIds[seat]) throw new Error('リーチ後はツモ牌を捨ててください');
+  if(!canDiscardTile(room,seat,room.hands[seat][index]))throw new Error(room.riichi[seat]?'リーチ後はツモ牌を捨ててください':'その牌は鳴いた直後に捨てられません');
   const wasRiichi=room.riichi[seat];
   if(declareRiichi){
     if(room.riichi[seat]||room.melds[seat].some(m=>/[+\-=]/.test(m.pattern))||room.scores[seat]<1000||room.wall.length<4) throw new Error('リーチできません');
@@ -99,13 +110,18 @@ function discard(room, token, tileId, declareRiichi=false) {
     room.doubleRiichi[seat]=room.uninterrupted&&room.discards[seat].length===0;room.riichi[seat]=true;room.ippatsu[seat]=true;room.scores[seat]-=1000;room.riichiSticks++;
   }
   if(wasRiichi)room.ippatsu[seat]=false;
-  const tile=room.hands[seat].splice(index,1)[0];room.drawnIds[seat]=null;room.discards[seat].push(tile);room.discardHistory[seat].push(tile.face);room.afterCall=false;room.allowedDiscards=null;room.rinshan=false;
+  else room.furiten[seat]=false;
+  const tile=room.hands[seat].splice(index,1)[0];room.drawnIds[seat]=null;tile.riichiDiscard=declareRiichi||room.markNextDiscard[seat];room.markNextDiscard[seat]=false;room.discards[seat].push(tile);room.discardHistory[seat].push(tile.face);room.afterCall=false;room.allowedDiscards=null;room.rinshan=false;
   room.pending={discarder:seat,tile,answers:{},riichiDeclaration:declareRiichi};room.phase='response';
   room.version++;
 }
-function ronResult(room,seat) {
+function waitingFaces(room,seat){
+  return waits(room.hands[seat].map(t=>t.face),room.melds[seat].map(m=>m.pattern));
+}
+function ronResult(room,seat,waiting) {
   const p=room.pending;if(!p||seat===p.discarder||room.furiten[seat])return null;
-  const faces=room.hands[seat].map(t=>t.face),melds=room.melds[seat].map(m=>m.pattern),waiting=waits(faces,melds);
+  const faces=room.hands[seat].map(t=>t.face),melds=room.melds[seat].map(m=>m.pattern);
+  waiting??=waitingFaces(room,seat);
   if(!waiting.includes(p.tile.face)||room.discardHistory[seat].some(face=>waiting.includes(face)))return null;
   const direction={1:'+',2:'=',3:'-'}[(p.discarder-seat+4)%4];
   return calculate(faces,p.tile.face,{seat:seatWind(room,seat),method:'ron',direction,riichi:room.riichi[seat],doubleRiichi:room.doubleRiichi[seat],ippatsu:room.ippatsu[seat],doraIndicators:room.doraIndicators,uraIndicators:uraFor(room,seat),riichiSticks:room.riichiSticks,honba:room.honba,melds,chankan:p.kind==='added-kan',lastTile:p.kind!=='added-kan'&&room.wall.length===0?2:0});
@@ -119,8 +135,8 @@ function respond(room,token,choice,pattern,tileIds) {
   const seat=seatFor(room,token),p=room.pending;
   if(room.phase!=='response'||!p||seat===p.discarder||p.answers[seat]) throw new Error('応答できません');
   if(!['pass','ron','chi','pon','kan'].includes(choice))throw new Error('応答が不正です');
-  const result=ronResult(room,seat);
-  if(choice==='ron'&&!result)throw new Error('ロンできません');
+  const waiting=waitingFaces(room,seat);
+  if(choice==='ron'&&!ronResult(room,seat,waiting))throw new Error('ロンできません');
   if(['chi','pon','kan'].includes(choice)){
     if(!optionsFor(room,seat)[choice].includes(pattern))throw new Error('その牌では鳴けません');
     const requiredCount=choice==='kan'?3:2;
@@ -130,7 +146,7 @@ function respond(room,token,choice,pattern,tileIds) {
     if(tiles.some(t=>!t)||tiles.map(t=>t.face).sort().join()!==required.join())throw new Error('選択した手牌が合いません');
     p.answers[seat]={choice,pattern,tileIds};
   } else p.answers[seat]={choice};
-  if(choice!=='ron'&&result) room.furiten[seat]=true;
+  if(choice!=='ron'&&waiting.includes(p.tile.face)) room.furiten[seat]=true;
   if(Object.keys(p.answers).length===3){
     const winners=Object.keys(p.answers).map(Number).filter(i=>p.answers[i].choice==='ron').sort((a,b)=>(a-p.discarder+4)%4-(b-p.discarder+4)%4);
     if(winners.length){
@@ -139,7 +155,7 @@ function respond(room,token,choice,pattern,tileIds) {
     }
     else if(p.kind==='added-kan'){
       const player=p.discarder,m=room.melds[player].find(m=>m.pattern===p.pattern.slice(0,5));
-      room.hands[player]=room.hands[player].filter(t=>t.id!==p.tile.id);m.pattern=p.pattern;m.tiles.push({face:p.tile.face,transparent:p.tile.transparent});replacementDraw(room,player);
+      room.hands[player]=room.hands[player].filter(t=>t.id!==p.tile.id);cancelIppatsu(room);m.pattern=p.pattern;m.tiles.push({face:p.tile.face,transparent:p.tile.transparent});replacementDraw(room,player);
     }
     else if(room.abortAfterDiscard){abortRound(room,'四槓散了');}
     else if(room.riichi.every(Boolean)){abortRound(room,'四家立直');}
@@ -147,7 +163,7 @@ function respond(room,token,choice,pattern,tileIds) {
       const callers=Object.keys(p.answers).map(Number).filter(i=>['chi','pon','kan'].includes(p.answers[i].choice)).sort((a,b)=>((p.answers[b].choice!=='chi')-(p.answers[a].choice!=='chi'))||((a-p.discarder+4)%4-(b-p.discarder+4)%4));
       const caller=callers[0],answer=p.answers[caller],used=answer.tileIds.map(id=>room.hands[caller].find(t=>t.id===id));
       cancelIppatsu(room);
-      room.hands[caller]=room.hands[caller].filter(t=>!answer.tileIds.includes(t.id));room.discards[p.discarder].pop();room.riverCalled[p.discarder]=true;
+      room.hands[caller]=room.hands[caller].filter(t=>!answer.tileIds.includes(t.id));room.discards[p.discarder].pop();room.markNextDiscard[p.discarder]=p.tile.riichiDiscard;room.riverCalled[p.discarder]=true;
       room.melds[caller].push({pattern:answer.pattern,tiles:[...used,p.tile].map(t=>({face:t.face,transparent:t.transparent}))});
       if(answer.choice==='kan')replacementDraw(room,caller);
       else {room.turn=caller;room.afterCall=true;room.allowedDiscards=callDiscards(room.hands[caller].map(t=>t.face),room.melds[caller].map(m=>m.pattern),answer.pattern);room.phase='playing';}
@@ -162,18 +178,20 @@ function respond(room,token,choice,pattern,tileIds) {
       }else{if(n>0&&n<4)room.scores=room.scores.map((s,i)=>s+(tenpai[i]?3000/n:-3000/(4-n)));room.result={method:'draw',tenpai};}
       room.phase='exhausted';room.turn=null;
     }
-    else {room.turn=(p.discarder+1)%4;const drawn=room.wall.pop();room.hands[room.turn].push(drawn);room.drawnIds[room.turn]=drawn.id;room.afterCall=false;if(!room.riichi[room.turn])room.furiten[room.turn]=false;room.phase='playing';}
+    else {room.turn=(p.discarder+1)%4;const drawn=room.wall.pop();room.hands[room.turn].push(drawn);room.drawnIds[room.turn]=drawn.id;room.afterCall=false;room.phase='playing';}
     room.pending=null;
   }
   room.version++;
 }
+function tsumoResult(room,seat,hand) {
+  if(room.phase!=='playing'||room.turn!==seat||room.afterCall||hand.length!==14-3*room.melds[seat].length)return null;
+  const heavenly=room.uninterrupted&&!room.rinshan&&room.discardHistory[seat].length===0?(seat===room.dealer?1:2):0;
+  return calculate(hand.slice(0,-1).map(t=>t.face),hand[hand.length-1].face,{seat:seatWind(room,seat),riichi:room.riichi[seat],doubleRiichi:room.doubleRiichi[seat],ippatsu:room.ippatsu[seat],heavenly,doraIndicators:room.doraIndicators,uraIndicators:uraFor(room,seat),riichiSticks:room.riichiSticks,honba:room.honba,melds:room.melds[seat].map(m=>m.pattern),rinshan:room.rinshan,lastTile:!room.rinshan&&room.wall.length===0?1:0});
+}
 function tsumo(room, token) {
   const seat=seatFor(room,token);
   if(room.phase!=='playing'||room.turn!==seat) throw new Error('あなたのツモ番ではありません');
-  const hand=drawnLast(room,seat);
-  if(room.afterCall||hand.length!==14-3*room.melds[seat].length) throw new Error('和了できる手牌ではありません');
-  const heavenly=room.uninterrupted&&!room.rinshan&&room.discardHistory[seat].length===0?(seat===room.dealer?1:2):0;
-  const result=calculate(hand.slice(0,-1).map(t=>t.face),hand[hand.length-1].face,{seat:seatWind(room,seat),riichi:room.riichi[seat],doubleRiichi:room.doubleRiichi[seat],ippatsu:room.ippatsu[seat],heavenly,doraIndicators:room.doraIndicators,uraIndicators:uraFor(room,seat),riichiSticks:room.riichiSticks,honba:room.honba,melds:room.melds[seat].map(m=>m.pattern),rinshan:room.rinshan,lastTile:!room.rinshan&&room.wall.length===0?1:0});
+  const hand=drawnLast(room,seat),result=tsumoResult(room,seat,hand);
   if(!result) throw new Error('和了できる役がありません');
   applyPayment(room,result.payments);
   room.result={winner:seat,method:'tsumo',winningTile:hand[hand.length-1].face,winningHand:hand.map(t=>({face:t.face,transparent:t.transparent})),uraIndicators:uraFor(room,seat),scoreChanges:room.scores.map((_,i)=>result.payments[seatWind(room,i)]),...result};room.riichiSticks=0;room.phase='won';room.turn=null;room.version++;
@@ -193,7 +211,7 @@ function addedKan(room,token,pattern,tileId){
  const options=ownKanOptions(drawnLast(room,seat).map(t=>t.face),room.melds[seat].map(m=>m.pattern),room.riichi[seat],room.wall.length,room.kanCount);
  const tile=room.hands[seat].find(t=>t.id===tileId);
  if(!options.includes(pattern)||!/[+\-=]\d$/.test(pattern)||!tile||tile.face!==pattern[0]+pattern.slice(-1))throw new Error('加カンできません');
- cancelIppatsu(room);room.pending={kind:'added-kan',discarder:seat,tile,pattern,answers:{}};room.phase='response';room.version++;
+ room.pending={kind:'added-kan',discarder:seat,tile,pattern,answers:{}};room.phase='response';room.version++;
 }
 function nextRound(room,token,randomInt){
   if(seatFor(room,token)!==0)throw new Error('進行できるのは部屋の作成者です');
@@ -208,11 +226,28 @@ function nextRound(room,token,randomInt){
   }
   deal(room,randomInt);
 }
+function riichiTiles(room,seat){
+  if(room.phase!=='playing'||room.turn!==seat||room.riichi[seat]||room.afterCall||
+     room.scores[seat]<1000||room.wall.length<4)return [];
+  const melds=room.melds[seat].map(m=>m.pattern);
+  if(melds.some(m=>/[+\-=]/.test(m)))return [];
+  const hand=room.hands[seat],legalFaces=new Map();
+  return hand.filter(tile=>{
+    if(!legalFaces.has(tile.face)){
+      const faces=hand.filter(t=>t.id!==tile.id).map(t=>t.face);
+      legalFaces.set(tile.face,waits(faces,melds).length>0);
+    }
+    return legalFaces.get(tile.face);
+  });
+}
 function snapshot(room, token) {
   const seat=seatFor(room,token);
+  const myTurn=room.phase==='playing'&&room.turn===seat;
+  const discardableIds=myTurn?room.hands[seat].filter(t=>canDiscardTile(room,seat,t)).map(t=>t.id):[];
+  const canTsumo=myTurn&&!!tsumoResult(room,seat,drawnLast(room,seat));
   const ownKans=room.phase==='playing'&&room.turn===seat&&!room.afterCall?ownKanOptions(drawnLast(room,seat).map(t=>t.face),room.melds[seat].map(m=>m.pattern),room.riichi[seat],room.wall.length,room.kanCount):[];
-  const riichiDiscards=room.phase==='playing'&&room.turn===seat&&!room.riichi[seat]&&!room.afterCall&&room.scores[seat]>=1000&&room.wall.length>=4&&!room.melds[seat].some(m=>/[+\-=]/.test(m.pattern))?room.hands[seat].filter((t,i)=>waits(room.hands[seat].filter((_,j)=>i!==j).map(t=>t.face),room.melds[seat].map(m=>m.pattern)).length>0).map(t=>t.id):[];
+  const riichiDiscards=riichiTiles(room,seat).map(t=>t.id);
   const rankings=room.phase==='finished'?room.scores.map((score,seat)=>({score,seat})).sort((a,b)=>b.score-a.score||a.seat-b.seat):null;
-  return {version:room.version,phase:room.phase,players:room.players.map(p=>({name:p.name})),seat,turn:room.turn,wallRemaining:room.wall.length,scores:room.scores,rankings,result:room.result,round:room.round,dealer:room.dealer,honba:room.honba,riichi:room.riichi,riichiSticks:room.riichiSticks,dora:room.dora,doraIndicators:room.doraIndicators,riichiDiscards,canNineTerminals:room.phase==='playing'&&canNineTerminals(room,seat),closedKans:ownKans.filter(m=>/^[mpsz]\d{4}$/.test(m)),addedKans:ownKans.filter(m=>/[+\-=]\d$/.test(m)),melds:room.melds,pending:room.pending?{kind:room.pending.kind||'discard',discarder:room.pending.discarder,tile:room.pending.tile.face,answered:!!room.pending.answers[seat],canRon:!!ronResult(room,seat),calls:optionsFor(room,seat)}:null, hands:room.hands.map((hand,i)=>visibleHand(hand,i===seat)),discards:room.discards.map(p=>p.map(t=>({face:t.face,transparent:t.transparent})))};
+  return {version:room.version,phase:room.phase,players:room.players.map(p=>({name:p.name})),seat,turn:room.turn,wallRemaining:room.wall.length,scores:room.scores,rankings,result:room.result,round:room.round,dealer:room.dealer,honba:room.honba,riichi:room.riichi,riichiSticks:room.riichiSticks,dora:room.dora,doraIndicators:room.doraIndicators,discardableIds,canTsumo,riichiDiscards,canNineTerminals:room.phase==='playing'&&canNineTerminals(room,seat),closedKans:ownKans.filter(m=>/^[mpsz]\d{4}$/.test(m)),addedKans:ownKans.filter(m=>/[+\-=]\d$/.test(m)),melds:room.melds,pending:room.pending?{kind:room.pending.kind||'discard',discarder:room.pending.discarder,tile:room.pending.tile.face,answered:!!room.pending.answers[seat],canRon:!!ronResult(room,seat),calls:optionsFor(room,seat)}:null, hands:room.hands.map((hand,i)=>visibleHand(hand,i===seat)),discards:room.discards.map(p=>p.map(t=>({face:t.face,transparent:t.transparent,riichiDiscard:t.riichiDiscard})))};
 }
 module.exports={createRoom,join,addCpu,advanceCpu,leave,start,discard,reorder,respond,tsumo,closedKan,addedKan,nineTerminals,nextRound,snapshot};
