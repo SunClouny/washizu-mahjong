@@ -17,11 +17,11 @@ main { padding-top:10px;padding-bottom:10px }
 .players.arena .player .score { margin:0;color:#f3d997;font-size:12px;white-space:nowrap }
 .players.arena .player.active { outline:2px solid #ffdf7b }
 .players.arena .seat-bottom { left:8%;bottom:4% }
-.players.arena .seat-top { right:calc(4% + 28px);top:4% }
+.players.arena .seat-top { right:38px;top:11% }
 .players.arena .seat-left { left:38px;top:50%;transform:translateY(-50%) }
 .players.arena .seat-right { right:38px;top:50%;bottom:auto;transform:translateY(-50%) }
 .players.arena .player .tiles { margin:0;min-height:0;gap:1px;flex-wrap:nowrap }
-.players.arena .seat-top .seat-hand { position:absolute;right:100%;top:0;flex-direction:row;width:max-content;max-width:none }
+.players.arena .seat-top .seat-hand { position:absolute;right:0;top:auto;bottom:calc(100% + 4px);flex-direction:row;width:max-content;max-width:none }
 .players.arena .seat-left .seat-hand { position:absolute;left:-29px;top:calc(50% - 32px);transform:translateY(-50%);flex-direction:column }
 .players.arena .seat-right .seat-hand { position:absolute;right:-29px;top:calc(50% + 32px);bottom:auto;transform:translateY(-50%);flex-direction:column }
 .players.arena .seat-top .seat-hand .tile { width:22px;min-width:22px;flex-shrink:0;height:29px;font-size:13px }
@@ -69,6 +69,7 @@ main { padding-top:10px;padding-bottom:10px }
  header { padding:9px 12px } h1{font-size:19px}
  .players.arena { aspect-ratio:auto;height:390px;min-height:390px;border-width:7px;border-radius:12px }
  .players.arena .player { padding:3px 5px;gap:3px;max-width:33% }
+ .players.arena .seat-top { right:29px }
  .players.arena .seat-left { left:29px } .players.arena .seat-right { right:29px }
  .players.arena .seat-left .seat-hand { left:-22px } .players.arena .seat-right .seat-hand { right:-22px }
  .players.arena .seat-left .seat-meld { left:-22px } .players.arena .seat-right .seat-meld { right:-22px }
