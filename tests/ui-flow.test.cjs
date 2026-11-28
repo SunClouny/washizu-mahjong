@@ -41,3 +41,5 @@ test('手牌を選んで移動先の牌を押すと一度で移動する',async(
  const server=createServer(),host=client(server);host.doc.getElementById('name').value='親';await host.doc.getElementById('create').onclick();for(let i=0;i<3;i++)await host.doc.getElementById('addCpu').onclick();await host.doc.getElementById('start').onclick();
  const hand=host.doc.getElementById('hand');const before=host.run('order.slice()');hand.children[0].onclick();hand.children[5].onclick();await new Promise(resolve=>setTimeout(resolve,20));const after=host.run('order.slice()');assert.equal(after[5],before[0]);assert.equal(after[0],before[1]);
 });
+
+test('CPU戦開始ボタンで部屋作成から配牌まで進む',async()=>{const c=client(createServer());c.doc.getElementById('name').value='親';await c.doc.getElementById('cpuGame').onclick();assert.equal(c.run('state.phase'),'playing');assert.equal(c.run('state.players.length'),4);assert.equal(c.doc.getElementById('hand').children.length,14);assert.equal(c.run('state.players[1].name'),'CPU 1')});
