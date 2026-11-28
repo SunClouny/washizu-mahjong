@@ -19,6 +19,7 @@ function createServer(){return http.createServer(async(req,res)=>{try{
   if(req.method==='GET'&&url.pathname==='/health'){return respond(res,200,{ok:true,stage:'development'});}
   if(req.method!=='POST'||!url.pathname.startsWith('/api/')) return respond(res,404,{error:'見つかりません'});
   const data=await body(req);
+  if(url.pathname==='/api/cpu-game'){const created=R.createRoom(data.name);for(let i=0;i<3;i++)R.addCpu(created.room,created.token);R.start(created.room,created.token);const code=roomCode();rooms.set(code,created.room);return respond(res,200,{code,token:created.token});}
   if(url.pathname==='/api/create'){const created=R.createRoom(data.name);const code=roomCode();rooms.set(code,created.room);return respond(res,200,{code,token:created.token});}
   const code=String(data.code||'').trim().toUpperCase();const room=rooms.get(code);
   if(!room) return respond(res,404,{error:'部屋が見つかりません'});
