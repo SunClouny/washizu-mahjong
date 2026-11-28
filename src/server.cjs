@@ -24,7 +24,8 @@ function createServer(){return http.createServer(async(req,res)=>{try{
   if(!room) return respond(res,404,{error:'部屋が見つかりません'});
   if(url.pathname==='/api/join'){const token=R.join(room,data.name);return respond(res,200,{code,token});}
   if(url.pathname==='/api/leave'){R.leave(room,data.token);if(!room.players.length)rooms.delete(data.code);return respond(res,200,{ok:true});}
-  if(url.pathname==='/api/state') return respond(res,200,R.snapshot(room,data.token));
+  if(url.pathname==='/api/add-cpu'){R.addCpu(room,data.token);return respond(res,200,R.snapshot(room,data.token));}
+  if(url.pathname==='/api/state'){R.snapshot(room,data.token);R.advanceCpu(room);return respond(res,200,R.snapshot(room,data.token));}
   if(url.pathname==='/api/start'){R.start(room,data.token);return respond(res,200,R.snapshot(room,data.token));}
   if(url.pathname==='/api/discard'){R.discard(room,data.token,data.tileId,data.riichi===true);return respond(res,200,R.snapshot(room,data.token));}
   if(url.pathname==='/api/reorder'){R.reorder(room,data.token,data.tileIds);return respond(res,200,R.snapshot(room,data.token));}
