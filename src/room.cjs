@@ -24,6 +24,11 @@ function join(room,name) {
   const token=makeToken(); room.players.push({name:cleanName(name),tokenHash:digest(token)}); room.version++;
   return token;
 }
+function leave(room, token) {
+  const seat=seatFor(room,token);
+  if(room.phase!=='lobby') throw new Error('対局中は退室できません。画面を閉じても再び参加できます');
+  room.players.splice(seat,1); room.version++;
+}
 function start(room, token, randomInt) {
   if(seatFor(room,token)!==0) throw new Error('開始できるのは部屋の作成者です');
   if(room.phase!=='lobby'||room.players.length!==4) throw new Error('4人そろうと開始できます');
@@ -184,4 +189,4 @@ function snapshot(room, token) {
   const rankings=room.phase==='finished'?room.scores.map((score,seat)=>({score,seat})).sort((a,b)=>b.score-a.score||a.seat-b.seat):null;
   return {version:room.version,phase:room.phase,players:room.players.map(p=>({name:p.name})),seat,turn:room.turn,wallRemaining:room.wall.length,scores:room.scores,rankings,result:room.result,round:room.round,dealer:room.dealer,honba:room.honba,riichi:room.riichi,riichiSticks:room.riichiSticks,dora:room.dora,doraIndicators:room.doraIndicators,canNineTerminals:room.phase==='playing'&&canNineTerminals(room,seat),closedKans:ownKans.filter(m=>/^[mpsz]\d{4}$/.test(m)),addedKans:ownKans.filter(m=>/[+\-=]\d$/.test(m)),melds:room.melds,pending:room.pending?{kind:room.pending.kind||'discard',discarder:room.pending.discarder,tile:room.pending.tile.face,answered:!!room.pending.answers[seat],canRon:!!ronResult(room,seat),calls:optionsFor(room,seat)}:null, hands:room.hands.map((hand,i)=>visibleHand(hand,i===seat)),discards:room.discards.map(p=>p.map(t=>({face:t.face,transparent:t.transparent})))};
 }
-module.exports={createRoom,join,start,discard,reorder,respond,tsumo,closedKan,addedKan,nineTerminals,nextRound,snapshot};
+module.exports={createRoom,join,leave,start,discard,reorder,respond,tsumo,closedKan,addedKan,nineTerminals,nextRound,snapshot};
