@@ -37,3 +37,7 @@ test('各視点で河は卓の四方向に分かれ、６列で並ぶ',async()=>
 });
 
 test('手牌サイズを調整し横幅に合わせられる',()=>{const c=client(createServer()),size=c.doc.getElementById('handSize'),hand=c.doc.getElementById('hand');size.value='60';size.oninput();assert.equal(hand.style['--hand-width'],'60px');c.doc.getElementById('handFit').onclick();assert.equal(hand.style['--hand-width'],'39px');});
+test('手牌を選んで移動先の牌を押すと一度で移動する',async()=>{
+ const server=createServer(),host=client(server);host.doc.getElementById('name').value='親';await host.doc.getElementById('create').onclick();for(let i=0;i<3;i++)await host.doc.getElementById('addCpu').onclick();await host.doc.getElementById('start').onclick();
+ const hand=host.doc.getElementById('hand');const before=host.run('order.slice()');hand.children[0].onclick();hand.children[5].onclick();await new Promise(resolve=>setTimeout(resolve,20));const after=host.run('order.slice()');assert.equal(after[5],before[0]);assert.equal(after[0],before[1]);
+});
